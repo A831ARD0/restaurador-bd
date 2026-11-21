@@ -1,0 +1,157 @@
+name: Compilar y publicar
+
+# Publica una version nueva al crear una etiqueta (git tag v1.1.0 && git push --tags).
+# Tambien se puede lanzar a mano desde la pestana Actions para probar la compilacion.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: macOS (.dmg)
+    runs-on: macos-latest
+    env:
+      # `secrets` no se puede usar en el `if` de un paso, pero si en el env del job
+      HAY_CERTIFICADO: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compilar la app
+        run: |
+          pyinstaller --noconfirm --clean --windowed \
+            --name "Restaurador de BD" \
+            --osx-bundle-identifier io.github.a831ard0.restauradorbd \
+            --icon recursos/icono.icns \
+            --collect-all webview \
+            --hidden-import pymysql \
+            restaurador_bd.py
+
+      # La firma solo ocurre si el repositorio tiene configurados los secretos.
+      # Sin ellos la app se compila igual, pero sin firmar (macOS pedira confirmacion).
+      - name: Firmar y notarizar
+        if: env.HAY_CERTIFICADO == 'true'
+        env:
+          CERT_P12: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          set -e
+          LLAVERO=$RUNNER_TEMP/firma.keychain-db
+          CLAVE=$(uuidgen)
+          security create-keychain -p "$CLAVE" "$LLAVERO"
+          security set-keychain-settings -lut 21600 "$LLAVERO"
+          security unlock-keychain -p "$CLAVE" "$LLAVERO"
+          echo "$CERT_P12" | base64 --decode > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 -k "$LLAVERO" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$CLAVE" "$LLAVERO"
+          security list-keychain -d user -s "$LLAVERO" login.keychain-db
+          rm -f $RUNNER_TEMP/cert.p12
+
+          IDENTIDAD=$(security find-identity -v -p codesigning "$LLAVERO" |
+                      grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"/\1/')
+          echo "Firmando con: $IDENTIDAD"
+          codesign --force --deep --timestamp --options runtime --sign "$IDENTIDAD" \
+            "dist/Restaurador de BD.app"
+          codesign --verify --strict "dist/Restaurador de BD.app"
+
+          xcrun notarytool store-credentials notarytool \
+            --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" \
+            --password "$NOTARY_PASSWORD" --keychain "$LLAVERO"
+          echo "FIRMADO=1" >> $GITHUB_ENV
+          echo "LLAVERO=$LLAVERO" >> $GITHUB_ENV
+
+      - name: Armar el DMG
+        run: |
+          rm -rf dist/dmg
+          mkdir -p dist/dmg
+          cp -R "dist/Restaurador de BD.app" dist/dmg/
+          ln -s /Applications "dist/dmg/Aplicaciones"
+          if [ -z "$FIRMADO" ]; then
+            cp "recursos/aviso-gatekeeper.txt" "dist/dmg/LEEME - si macOS no la deja abrir.txt"
+          fi
+          hdiutil create -volname "Restaurador de BD" -srcfolder dist/dmg -ov -format UDZO \
+            "Restaurador-de-BD-macOS.dmg"
+          rm -rf dist/dmg
+
+      - name: Notarizar el DMG
+        if: env.FIRMADO == '1'
+        run: |
+          set -e
+          IDENTIDAD=$(security find-identity -v -p codesigning "$LLAVERO" |
+                      grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"/\1/')
+          codesign --force --timestamp --sign "$IDENTIDAD" "Restaurador-de-BD-macOS.dmg"
+          xcrun notarytool submit "Restaurador-de-BD-macOS.dmg" \
+            --keychain-profile notarytool --keychain "$LLAVERO" --wait
+          xcrun stapler staple "Restaurador-de-BD-macOS.dmg"
+          spctl -a -vvv -t install "Restaurador-de-BD-macOS.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: Restaurador-de-BD-macOS.dmg
+
+  windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compilar el ejecutable
+        run: |
+          pyinstaller --noconfirm --clean --windowed --onefile `
+            --name "Restaurador de BD" `
+            --icon recursos/icono.ico `
+            --collect-all webview `
+            --hidden-import pymysql `
+            restaurador_bd.py
+          Copy-Item "dist/Restaurador de BD.exe" "Restaurador-de-BD-Windows.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: Restaurador-de-BD-Windows.exe
+
+  publicar:
+    name: Publicar en Releases
+    needs: [macos, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: binarios
+
+      - name: Subir al release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" \
+            --title "${GITHUB_REF_NAME}" --generate-notes || true
+          gh release upload "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" --clobber \
+            "binarios/macos/Restaurador-de-BD-macOS.dmg" \
+            "binarios/windows/Restaurador-de-BD-Windows.exe"
