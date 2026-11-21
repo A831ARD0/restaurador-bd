@@ -27,23 +27,10 @@ Descarga desde [Releases](../../releases):
 
 No necesitas instalar Python ni MySQL: la app trae dentro todo lo necesario.
 
-### La primera vez en macOS
+### Sobre la seguridad de macOS
 
-La app no está firmada con un certificado de Apple de pago, así que al abrirla macOS
-dirá *«Apple no pudo verificar que "Restaurador de BD" no contenga software malicioso»*.
-**No le des a «Mover al basurero»**: pulsa `Listo` y haz una de estas dos cosas.
-
-**Opción A — desde Ajustes:** Ajustes del Sistema → Privacidad y seguridad → baja hasta
-*Seguridad* → junto a "Restaurador de BD" pulsa **Abrir de todos modos**.
-
-**Opción B — una línea en Terminal:**
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/Restaurador de BD.app"
-```
-
-Cualquiera de las dos se hace una sola vez. Es el aviso estándar de macOS para apps
-distribuidas fuera de la App Store sin una cuenta de desarrollador de Apple.
+La app de macOS va **firmada con un Developer ID y notarizada por Apple**, así que
+se abre con doble clic como cualquier otra: sin avisos ni pasos extra.
 
 ## Cómo funciona
 

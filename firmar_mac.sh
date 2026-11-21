@@ -36,6 +36,19 @@ rm -rf dist/dmg "$DMG"
 mkdir -p dist/dmg
 cp -R "$APP" dist/dmg/
 ln -s /Applications "dist/dmg/Aplicaciones"
+cat > "dist/dmg/LEEME - si macOS no la deja abrir.txt" <<'TXT'
+Si al abrir la app macOS dice que "Apple no pudo verificar que no contenga
+software malicioso", NO le des a "Mover al basurero": pulsa "Listo" y haz
+cualquiera de estas dos cosas, una sola vez.
+
+A) Ajustes del Sistema -> Privacidad y seguridad -> baja hasta "Seguridad"
+   -> junto a "Restaurador de BD" pulsa "Abrir de todos modos".
+
+B) En la Terminal:
+   xattr -dr com.apple.quarantine "/Applications/Restaurador de BD.app"
+
+Codigo fuente: https://github.com/A831ARD0/restaurador-bd
+TXT
 hdiutil create -volname "Restaurador de BD" -srcfolder dist/dmg -ov -format UDZO "$DMG" >/dev/null
 rm -rf dist/dmg
 codesign --force --timestamp --sign "$IDENTIDAD" "$DMG"
