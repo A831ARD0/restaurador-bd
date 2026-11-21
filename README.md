@@ -100,6 +100,9 @@ cd restaurador-bd
 ```
 
 - **macOS:** `./construir_mac.sh` → genera la app y el `.dmg` en `dist/`.
+  Con una cuenta de Apple Developer, `./firmar_mac.sh` firma y notariza el `.dmg`
+  para que se abra sin el aviso de Gatekeeper (requiere un certificado
+  *Developer ID Application*; el script explica cómo prepararlo).
 - **Windows:** doble clic a `construir_windows.bat` → genera `dist\Restaurador de BD.exe`.
 
 Cada plataforma se compila en su propio sistema: PyInstaller no compila cruzado.
