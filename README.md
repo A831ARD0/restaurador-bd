@@ -106,8 +106,9 @@ Eso compila el `.dmg` en un runner de macOS y el `.exe` en uno de Windows, y los
 adjunta al release. Tambien se puede lanzar a mano desde la pestana **Actions**
 para comprobar que todo compila, sin publicar nada.
 
-Para que ademas firme y notarice la app de macOS, hay que configurar estos
-secretos en *Settings → Secrets and variables → Actions*:
+Para que ademas firme y notarice la app de macOS hacen falta dos cosas.
+
+**1. Los secretos** en *Settings → Secrets and variables → Actions*:
 
 | Secreto | Contenido |
 |---|---|
@@ -117,7 +118,19 @@ secretos en *Settings → Secrets and variables → Actions*:
 | `NOTARY_TEAM_ID` | el Team ID |
 | `NOTARY_PASSWORD` | una *app-specific password* de appleid.apple.com |
 
-Sin esos secretos el workflow compila igual, pero la app sale sin firmar.
+**2. La variable** `FIRMAR_MACOS` con valor `true`, en la pestana *Variables* de esa
+misma pantalla.
+
+Sin eso el workflow compila igual, pero la app sale sin firmar.
+
+### Como se protegen esos secretos
+
+- Las acciones se referencian **por SHA de commit**, no por etiqueta: una etiqueta
+  puede reapuntarse a otro commit, un SHA no.
+- La firma vive en un job aparte, asociado al entorno protegido **`firma-macos`**,
+  que exige **aprobacion manual** antes de dar acceso a los secretos y solo se
+  permite desde etiquetas `v*`. Compilar no toca ningun secreto.
+- Los pull requests desde forks nunca reciben secretos (comportamiento de GitHub).
 
 ## Estructura
 
