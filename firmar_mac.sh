@@ -40,6 +40,18 @@ hdiutil create -volname "Restaurador de BD" -srcfolder dist/dmg -ov -format UDZO
 rm -rf dist/dmg
 codesign --force --timestamp --sign "$IDENTIDAD" "$DMG"
 
+if ! xcrun notarytool history --keychain-profile "$PERFIL" >/dev/null 2>&1; then
+  echo
+  echo "La app y el DMG ya estan firmados, pero falta notarizar."
+  echo "Guarda las credenciales una sola vez y vuelve a correr este script:"
+  echo
+  echo "  xcrun notarytool store-credentials \"$PERFIL\" \\"
+  echo "    --apple-id TU_APPLE_ID --team-id \$(echo \"$IDENTIDAD\" | sed -E 's/.*\((.*)\)/\1/')"
+  echo
+  echo "(la contrasena es una app-specific password de appleid.apple.com -> Seguridad)"
+  exit 2
+fi
+
 echo "Enviando a notarizar (tarda unos minutos)..."
 xcrun notarytool submit "$DMG" --keychain-profile "$PERFIL" --wait
 
