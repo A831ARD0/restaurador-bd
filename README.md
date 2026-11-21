@@ -23,11 +23,27 @@ traía el respaldo contra los que realmente quedaron en la base.
 Descarga desde [Releases](../../releases):
 
 - **macOS** — `Restaurador de BD.dmg`: ábrelo y arrastra la app a Aplicaciones.
-  La primera vez: clic derecho sobre la app → **Abrir** → Abrir (no está firmada con
-  un certificado de pago de Apple, así que macOS pide esa confirmación una vez).
 - **Windows** — `Restaurador de BD.exe`: cópialo donde quieras y doble clic.
 
 No necesitas instalar Python ni MySQL: la app trae dentro todo lo necesario.
+
+### La primera vez en macOS
+
+La app no está firmada con un certificado de Apple de pago, así que al abrirla macOS
+dirá *«Apple no pudo verificar que "Restaurador de BD" no contenga software malicioso»*.
+**No le des a «Mover al basurero»**: pulsa `Listo` y haz una de estas dos cosas.
+
+**Opción A — desde Ajustes:** Ajustes del Sistema → Privacidad y seguridad → baja hasta
+*Seguridad* → junto a "Restaurador de BD" pulsa **Abrir de todos modos**.
+
+**Opción B — una línea en Terminal:**
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Restaurador de BD.app"
+```
+
+Cualquiera de las dos se hace una sola vez. Es el aviso estándar de macOS para apps
+distribuidas fuera de la App Store sin una cuenta de desarrollador de Apple.
 
 ## Cómo funciona
 
