@@ -2,7 +2,10 @@
 # Genera "Restaurador de BD.app" y el instalador .dmg (solo se corre en Mac).
 set -e
 cd "$(dirname "$0")"
-[ -d .venv ] || python3 -m venv .venv
+# Preferir un Python moderno: el que trae macOS es 3.9 y da problemas al empaquetar
+PY=$(command -v python3.13 || command -v python3.12 || command -v python3.11 || command -v python3)
+[ -d .venv ] || "$PY" -m venv .venv
+echo "Compilando con $("./.venv/bin/python" -V)"
 ./.venv/bin/pip install --quiet --upgrade pip
 ./.venv/bin/pip install --quiet pymysql pywebview pyinstaller
 ./.venv/bin/pyinstaller --noconfirm --clean --windowed \
