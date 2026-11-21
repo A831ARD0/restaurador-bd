@@ -94,6 +94,31 @@ cd restaurador-bd
 
 Cada plataforma se compila en su propio sistema: PyInstaller no compila cruzado.
 
+### Publicar una version
+
+El repositorio compila solo con GitHub Actions. Para sacar una version nueva:
+
+```bash
+git tag v1.1.0 && git push --tags
+```
+
+Eso compila el `.dmg` en un runner de macOS y el `.exe` en uno de Windows, y los
+adjunta al release. Tambien se puede lanzar a mano desde la pestana **Actions**
+para comprobar que todo compila, sin publicar nada.
+
+Para que ademas firme y notarice la app de macOS, hay que configurar estos
+secretos en *Settings → Secrets and variables → Actions*:
+
+| Secreto | Contenido |
+|---|---|
+| `MAC_CERT_P12_BASE64` | el `.p12` del certificado Developer ID en base64 (`base64 -i cert.p12 \| pbcopy`) |
+| `MAC_CERT_PASSWORD` | la contrasena de ese `.p12` |
+| `NOTARY_APPLE_ID` | el Apple ID de la cuenta de desarrollador |
+| `NOTARY_TEAM_ID` | el Team ID |
+| `NOTARY_PASSWORD` | una *app-specific password* de appleid.apple.com |
+
+Sin esos secretos el workflow compila igual, pero la app sale sin firmar.
+
 ## Estructura
 
 ```
