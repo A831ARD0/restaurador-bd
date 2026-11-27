@@ -15,6 +15,7 @@ cd "$(dirname "$0")"
 
 APP="dist/Restaurador de BD.app"
 DMG="dist/Restaurador de BD.dmg"
+RUTA_ZIP="$TMPDIR/app-para-notarizar.zip"
 PERFIL="${PERFIL_NOTARIZACION:-notarytool}"
 
 IDENTIDAD=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 |
@@ -31,48 +32,30 @@ codesign --force --deep --timestamp --options runtime \
          --sign "$IDENTIDAD" "$APP"
 codesign --verify --strict --verbose=2 "$APP"
 
-echo "Rehaciendo el DMG con la app ya firmada..."
+# Apple recomienda notarizar y GRAPAR la app antes de meterla en el DMG: asi el
+# ticket viaja dentro de la app y Gatekeeper la acepta aunque no haya internet.
+echo "Notarizando la app (tarda unos minutos)..."
+rm -f "$RUTA_ZIP"
+ditto -c -k --keepParent "$APP" "$RUTA_ZIP"
+xcrun notarytool submit "$RUTA_ZIP" --keychain-profile "$PERFIL" --wait
+xcrun stapler staple "$APP"
+rm -f "$RUTA_ZIP"
+
+echo "Armando el DMG con la app ya grapada..."
 rm -rf dist/dmg "$DMG"
 mkdir -p dist/dmg
 cp -R "$APP" dist/dmg/
 ln -s /Applications "dist/dmg/Aplicaciones"
-cat > "dist/dmg/LEEME - si macOS no la deja abrir.txt" <<'TXT'
-Si al abrir la app macOS dice que "Apple no pudo verificar que no contenga
-software malicioso", NO le des a "Mover al basurero": pulsa "Listo" y haz
-cualquiera de estas dos cosas, una sola vez.
-
-A) Ajustes del Sistema -> Privacidad y seguridad -> baja hasta "Seguridad"
-   -> junto a "Restaurador de BD" pulsa "Abrir de todos modos".
-
-B) En la Terminal:
-   xattr -dr com.apple.quarantine "/Applications/Restaurador de BD.app"
-
-Codigo fuente: https://github.com/A831ARD0/restaurador-bd
-TXT
 hdiutil create -volname "Restaurador de BD" -srcfolder dist/dmg -ov -format UDZO "$DMG" >/dev/null
 rm -rf dist/dmg
 codesign --force --timestamp --sign "$IDENTIDAD" "$DMG"
 
-if ! xcrun notarytool history --keychain-profile "$PERFIL" >/dev/null 2>&1; then
-  echo
-  echo "La app y el DMG ya estan firmados, pero falta notarizar."
-  echo "Guarda las credenciales una sola vez y vuelve a correr este script:"
-  echo
-  echo "  xcrun notarytool store-credentials \"$PERFIL\" \\"
-  echo "    --apple-id TU_APPLE_ID --team-id \$(echo \"$IDENTIDAD\" | sed -E 's/.*\((.*)\)/\1/')"
-  echo
-  echo "(la contrasena es una app-specific password de appleid.apple.com -> Seguridad)"
-  exit 2
-fi
-
-echo "Enviando a notarizar (tarda unos minutos)..."
+echo "Notarizando el DMG..."
 xcrun notarytool submit "$DMG" --keychain-profile "$PERFIL" --wait
-
-echo "Grapando el resultado..."
 xcrun stapler staple "$DMG"
-xcrun stapler validate "$DMG"
 
 echo
-echo "Listo. Comprobacion final:"
-spctl -a -vvv -t install "$DMG" || true
-echo "Ya se puede subir al release; se abrira con doble clic sin avisos."
+echo "Comprobacion final:"
+xcrun stapler validate "$APP"
+spctl -a -vvv -t install "$DMG" 2>&1 | head -3
+echo "Listo: la app y el DMG llevan el ticket grapado."

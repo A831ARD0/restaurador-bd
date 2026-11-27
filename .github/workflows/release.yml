@@ -97,6 +97,16 @@ jobs:
             --keychain "$LLAVERO" --sign "$IDENTIDAD" "dist/Restaurador de BD.app"
           codesign --verify --strict "dist/Restaurador de BD.app"
 
+          xcrun notarytool store-credentials notarytool --keychain "$LLAVERO" \
+            --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_PASSWORD"
+
+          # Primero la app: su ticket tiene que viajar dentro del DMG para que
+          # Gatekeeper la acepte aunque el equipo no tenga internet.
+          ditto -c -k --keepParent "dist/Restaurador de BD.app" app.zip
+          xcrun notarytool submit app.zip --keychain-profile notarytool --keychain "$LLAVERO" --wait
+          xcrun stapler staple "dist/Restaurador de BD.app"
+          rm -f app.zip
+
           rm -rf dist/dmg && mkdir -p dist/dmg
           cp -R "dist/Restaurador de BD.app" dist/dmg/
           ln -s /Applications "dist/dmg/Aplicaciones"
@@ -105,11 +115,10 @@ jobs:
           codesign --force --timestamp --keychain "$LLAVERO" --sign "$IDENTIDAD" \
             "Restaurador-de-BD-macOS.dmg"
 
-          xcrun notarytool store-credentials notarytool --keychain "$LLAVERO" \
-            --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_PASSWORD"
           xcrun notarytool submit "Restaurador-de-BD-macOS.dmg" \
             --keychain-profile notarytool --keychain "$LLAVERO" --wait
           xcrun stapler staple "Restaurador-de-BD-macOS.dmg"
+          xcrun stapler validate "dist/Restaurador de BD.app"
           spctl -a -vvv -t install "Restaurador-de-BD-macOS.dmg"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
